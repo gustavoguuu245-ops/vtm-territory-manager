@@ -123,9 +123,16 @@ try:
     db.commit()
 except ImportError:
     pass
+
 except Exception:
     db.rollback()
     pass
+st.markdown("---")
+st.markdown(
+    "🌐 **Junte-se à nossa comunidade no Reddit!** "
+    "[r/VampiroBrasil](https://www.reddit.com/r/VampiroBrasil/) | "
+    "Se quiser ajudar, siga a página, torne-se membro para incentivar a gente a crescer!"
+)
 
 if current_page == "dashboard" or current_page == "":
     # ===== DASHBOARD =====
@@ -311,11 +318,6 @@ elif current_page == "admin":
                         )
             except ImportError:
                 st.warning("⚠️ Ainda não criamos a tabela de logs. Crie o arquivo `core/models/access_log.py` e recrie o banco.")
-            st.markdown("---")
-            st.markdown(
-                "🌐 **Junte-se à nossa comunidade no Reddit!** "
-                "[r/VampiroBrasil](https://www.reddit.com/r/VampiroBrasil/) | "
-                "Se quiser ajudar, siga a página, torne-se membro para incentivar a gente a crescer!"
-            )
+            
 else:
     st.warning("Página não encontrada")
