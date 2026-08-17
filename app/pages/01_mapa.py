@@ -91,7 +91,7 @@ def render_mapa():
             territories,
             center=(selected_region.center_lat, selected_region.center_lng),
             zoom=selected_region.zoom_level,
-            enable_draw=user.is_narrador() and not is_viewing_other, # <-- BLOQUEIO AQUI
+            enable_draw=not is_viewing_other,
             key=f"map_{selected_region.id}"
         )
         
