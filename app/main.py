@@ -1,8 +1,10 @@
-# app/main.py - VERSÃO COMPLETA (COM LOG DE IPs E PAINEL ADMIN HIERÁRQUICO)
-"""Aplicação principal - Login e Dashboard."""
 import streamlit as st
 import sys
 import os
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 
 st.set_page_config(
     page_title="VTM Territory Manager",
