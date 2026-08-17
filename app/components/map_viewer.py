@@ -25,6 +25,10 @@ def get_clan_color(clan: str) -> str:
         "Ravnos": "#FF8C00",
         "Neutro": "#808080",
         "Caçador": "#DC143C",
+        "Ministry": "#FFD700",      
+        "Hecata": "#556B2F",        
+        "Banu Haqim": "#8B4513",   
+        "The Thin-Blood": "#FFFFFF",
     }
     return colors.get(clan, "#808080")
 

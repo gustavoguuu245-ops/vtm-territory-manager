@@ -154,7 +154,7 @@ def render_mapa():
         with col1:
             clan = st.selectbox(
                 "Clã Dominante",
-                ["Brujah", "Gangrel", "Malkavian", "Nosferatu", "Toreador", "Tremere", "Ventrue", "Neutro"],
+                ["Brujah", "Gangrel", "Malkavian", "Nosferatu", "Setita", "Toreador", "Tremere", "Ventrue", "Lasombra", "Tzimisce", "Assamita", "Ravnos", "Giovanni", "Banu Haqim", "Ministry", "Hecata", "Neutro", "Caçador", "The Thin-Blood"],
                 disabled=not can_create
             )
         with col2:
