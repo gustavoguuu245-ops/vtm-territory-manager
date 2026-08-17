@@ -40,34 +40,60 @@ render_sidebar()
 # ========== CONTROLE DE PÁGINAS ==========
 current_page = st.query_params.get("page", "dashboard")
 
-# ========== TELA DE LOGIN ==========
+# ========== TELA DE LOGIN / CADASTRO ==========
 if st.session_state.user is None:
     st.title("🧛 Vampiro: A Máscara - Territory Manager")
     st.markdown("### Sistema de Gestão de Territórios")
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        with st.container(border=True):
-            st.subheader("🔐 Login")
-            username = st.text_input("Usuário", key="login_user")
-            password = st.text_input("Senha", type="password", key="login_pass")
-            
-            if st.button("Entrar", use_container_width=True, type="primary"):
-                db = get_streamlit_db()
-                user = AuthManager.authenticate(db, username, password)
-                if user:
-                    st.session_state.user = user
-                    st.success(f"Bem-vindo, {user.username}!")
-                    st.rerun()
-                else:
-                    st.error("Usuário ou senha incorretos")
+        # CRIA AS ABAS DE LOGIN E CRIAÇÃO DE CONTA
+        tab1, tab2 = st.tabs(["🔐 Login", "➕ Criar Conta"])
         
-        st.info("""
-        **Contas padrão:**
-        - Narrador: `narrador` / `narrador123`
-        - Jogador BR: `jogador_br` / `br123`
-        - Jogador ES: `jogador_es` / `es123`
-        """)
+        with tab1:
+            with st.container(border=True):
+                st.subheader("Login")
+                username = st.text_input("Usuário", key="login_user")
+                password = st.text_input("Senha", type="password", key="login_pass")
+                
+                if st.button("Entrar", use_container_width=True, type="primary"):
+                    db = get_streamlit_db()
+                    user = AuthManager.authenticate(db, username, password)
+                    if user:
+                        st.session_state.user = user
+                        st.success(f"Bem-vindo, {user.username}!")
+                        st.rerun()
+                    else:
+                        st.error("Usuário ou senha incorretos")
+
+        with tab2:
+            with st.container(border=True):
+                st.subheader("Crie sua conta")
+                new_username = st.text_input("Escolha seu nome de usuário", key="new_user")
+                new_password = st.text_input("Crie uma senha", type="password", key="new_pass")
+                new_email = st.text_input("Seu e-mail (opcional)", key="new_email")
+                
+                if st.button("Criar Conta", use_container_width=True, type="primary"):
+                    if not new_username or not new_password:
+                        st.error("Preencha o nome de usuário e a senha!")
+                    else:
+                        db = get_streamlit_db()
+                        existing = AuthManager.get_user_by_username(db, new_username)
+                        if existing:
+                            st.error("Este nome de usuário já existe. Escolha outro.")
+                        else:
+                            # Cria o usuário. A primeira conta criada na nuvem será o ID 1 (Supremo)
+                            AuthManager.create_user(
+                                db, 
+                                username=new_username, 
+                                password=new_password, 
+                                email=new_email if new_email else None,
+                                role="jogador",
+                                assigned_region="Global"
+                            )
+                            st.success("✅ Conta criada! Agora faça login com seu novo usuário.")
+                            st.rerun()
+    
     st.stop()
 
 # ========== ROTEAMENTO DE PÁGINAS ==========
@@ -79,13 +105,8 @@ service = TerritoryService(db)
 # NOVO: Registra o IP e a visita do usuário no banco
 # ============================================================
 try:
-    # Importa o modelo de log
     from core.models.access_log import AccessLog
-    
-    # Tenta pegar o IP real (No Streamlit Cloud fica no header X-Forwarded-For)
     try:
-        # st.context.headers foi implementado em versões recentes do Streamlit
-        # Se der erro, pegamos um valor padrão
         headers = st.context.headers
         ip = headers.get("X-Forwarded-For", headers.get("Host", "Desconhecido"))
         user_agent = headers.get("User-Agent", "Desconhecido")
@@ -93,7 +114,6 @@ try:
         ip = "Localhost/Desconhecido"
         user_agent = "Desconhecido"
     
-    # Cria o registro de log
     log_entry = AccessLog(
         ip_address=ip,
         user_agent=user_agent,
@@ -102,21 +122,16 @@ try:
     db.add(log_entry)
     db.commit()
 except ImportError:
-    # Se o modelo não existir (não criou o arquivo), apenas ignora
     pass
 except Exception:
-    # Se der qualquer outro erro, ignora e não quebra o site
     db.rollback()
     pass
-# ============================================================
 
 if current_page == "dashboard" or current_page == "":
     # ===== DASHBOARD =====
     st.title(f"🗺️ Dashboard - {user.assigned_region or 'Global'}")
     
-    # Cards de resumo
     cols = st.columns(4)
-    
     all_territories = service.get_territories()
     user_region = user.assigned_region
     
@@ -142,15 +157,12 @@ if current_page == "dashboard" or current_page == "":
         st.metric("Última Alteração", last_change)
     
     st.markdown("---")
-    
-    # Visão rápida do mapa
     st.subheader("Visão Global")
     if region_territories:
         render_map(region_territories, key="dashboard_map")
     else:
         st.info("Nenhum território cadastrado ainda.")
     
-    # Atividade recente
     st.markdown("---")
     st.subheader("📜 Atividade Recente")
     history = service.get_history(limit=10)
@@ -166,11 +178,10 @@ if current_page == "dashboard" or current_page == "":
         st.info("Nenhuma atividade registrada ainda.")
 
 elif current_page == "mapa":
-    # ===== MAPA - Importa direto da pasta pages =====
+    # ===== MAPA =====
     try:
         import importlib.util
         import os
-        
         file_path = os.path.join(os.path.dirname(__file__), "pages", "01_mapa.py")
         
         if os.path.exists(file_path):
@@ -184,7 +195,6 @@ elif current_page == "mapa":
                 st.error("O arquivo 01_mapa.py não tem a função 'render_mapa'")
         else:
             st.error(f"❌ Arquivo não encontrado: {file_path}")
-            st.info("Verifique se o arquivo está em app/pages/01_mapa.py")
             
     except Exception as e:
         st.error(f"❌ Erro ao carregar o mapa: {e}")
@@ -208,9 +218,7 @@ elif current_page == "historico":
         st.info("Nenhuma alteração registrada.")
 
 elif current_page == "admin":
-    # ===== ADMIN (COM HIERARQUIA DE SEGURANÇA) =====
-    
-    # Restrição de acesso: apenas ID 1 (Supremo) ou se tiver role de moderador
+    # ===== ADMIN =====
     if user.id != 1 and user.role != "moderator":
         st.error("🚫 Acesso restrito ao Supremo (ID 1) e Moderadores autorizados.")
     else:
@@ -221,7 +229,6 @@ elif current_page == "admin":
         from core.auth.authenticator import AuthManager
         from sqlalchemy import update
         
-        # Cria as abas do painel
         tab1, tab2, tab3 = st.tabs(["👤 Gerenciar Usuários", "🌍 Regiões", "📊 Estatísticas do Site"])
         
         with tab1:
@@ -235,11 +242,9 @@ elif current_page == "admin":
                     cols[1].write(f"Role: `{u.role}`")
                     cols[2].write(f"Clã: {u.clan or 'N/A'}")
                     
-                    # COLUNA DE AÇÕES
                     with cols[3]:
-                        # 1. Promover/Rebaixar a Moderador (Apenas SUPREMO pode fazer isso)
                         if user.id == 1:
-                            if u.id != 1: # Não pode modificar a si mesmo
+                            if u.id != 1:
                                 if u.role == "moderator":
                                     if st.button(f"⬇️ Rebaixar para Jogador", key=f"demote_{u.id}", type="secondary"):
                                         db.execute(update(User).where(User.id == u.id).values(role="jogador"))
@@ -253,7 +258,6 @@ elif current_page == "admin":
                                         st.success(f"{u.username} agora é Moderador!")
                                         st.rerun()
 
-                        # 2. Resetar Senha (Apenas SUPREMO)
                         if user.id == 1:
                             if st.button(f"🔑 Resetar Senha (123456)", key=f"reset_{u.id}"):
                                 if u.id == 1:
@@ -265,7 +269,6 @@ elif current_page == "admin":
                                     st.success(f"Senha de '{u.username}' resetada para `123456`!")
                                     st.rerun()
                         
-                        # 3. Excluir Conta (Apenas SUPREMO)
                         if user.id == 1:
                             if st.button(f"🗑️ Excluir Conta", key=f"delete_{u.id}", type="secondary"):
                                 if u.id == 1:
@@ -284,10 +287,8 @@ elif current_page == "admin":
         
         with tab3:
             st.subheader("📊 Métricas de Acesso e IPs")
-            
             try:
                 from core.models.access_log import AccessLog
-                
                 logs = db.query(AccessLog).all()
                 
                 if not logs:
