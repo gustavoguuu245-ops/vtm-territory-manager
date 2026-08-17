@@ -1,5 +1,15 @@
-# app/pages/03_Admin.py - VERSÃO HIERÁRQUICA (SUPREMO + MODERADORES)
+# app/pages/03_Admin.py - VERSÃO CORRIGIDA (COM CAMINHO ABSOLUTO)
+import sys
+import os
 import streamlit as st
+
+# ==========================================
+# ESSA É A CORREÇÃO MÁGICA PARA ACHAR O CORE
+# ==========================================
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+# ==========================================
 
 st.set_page_config(
     page_title="Admin",
@@ -39,7 +49,7 @@ st.caption(f"Bem-vindo, {user.username}. Seu nível de acesso: **{'👑 Supremo'
 db = get_streamlit_db()
 service = TerritoryService(db)
 
-# Cria as abas do painel
+# ========== ABAS ==========
 tab1, tab2, tab3 = st.tabs(["👤 Gerenciar Usuários", "🌍 Regiões", "📊 Estatísticas do Site"])
 
 # ========== ABA 1: GERENCIAR USUÁRIOS ==========
@@ -57,26 +67,22 @@ with tab1:
             cols[1].write(f"Role: `{u.role}`")
             cols[2].write(f"Clã: {u.clan or 'N/A'}")
             
-            # COLUNA DE AÇÕES
             with cols[3]:
-                # 1. Promover/Rebaixar a Moderador (Apenas SUPREMO pode fazer isso)
                 if is_supreme:
-                    if u.id != 1: # Não pode modificar a si mesmo
+                    if u.id != 1:
                         if u.role == "moderator":
-                            if st.button(f"⬇️ Rebaixar para Jogador", key=f"demote_{u.id}", type="secondary"):
+                            if st.button(f"⬇️ Rebaixar", key=f"demote_{u.id}", type="secondary"):
                                 db.execute(update(User).where(User.id == u.id).values(role="jogador"))
                                 db.commit()
                                 st.success(f"{u.username} agora é Jogador.")
                                 st.rerun()
                         else:
-                            if st.button(f"⬆️ Promover a Moderador", key=f"promote_{u.id}"):
+                            if st.button(f"⬆️ Promover", key=f"promote_{u.id}"):
                                 db.execute(update(User).where(User.id == u.id).values(role="moderator"))
                                 db.commit()
                                 st.success(f"{u.username} agora é Moderador!")
                                 st.rerun()
 
-                # 2. Resetar Senha (Apenas SUPREMO)
-                if is_supreme:
                     if st.button(f"🔑 Resetar Senha (123456)", key=f"reset_{u.id}"):
                         if u.id == 1:
                             st.warning("Você não pode resetar sua própria senha pelo painel.")
@@ -86,33 +92,74 @@ with tab1:
                             db.commit()
                             st.success(f"Senha de '{u.username}' resetada para `123456`!")
                             st.rerun()
-                
-                # 3. Excluir Conta (Apenas SUPREMO)
-                if is_supreme:
-                    if st.button(f"🗑️ Excluir Conta", key=f"delete_{u.id}", type="secondary"):
+                    
+                    if st.button(f"🗑️ Excluir", key=f"delete_{u.id}", type="secondary"):
                         if u.id == 1:
                             st.error("Você não pode excluir a sua própria conta!")
                         else:
                             db.delete(u)
                             db.commit()
-                            st.success(f"Usuário '{u.username}' removido com sucesso!")
+                            st.success(f"Usuário '{u.username}' removido!")
                             st.rerun()
 
-# ========== ABA 2: REGIÕES ==========
+# ========== ABA 2: REGIÕES (COM CRIADOR) ==========
 with tab2:
     st.subheader("🌍 Regiões Cadastradas")
+    
     regions = service.get_regions()
-    for r in regions:
-        st.write(f"📍 **{r.display_name}** (`{r.name}`)")
+    if regions:
+        for r in regions:
+            st.write(f"📍 **{r.display_name}** (`{r.name}`)")
+    else:
+        st.info("📭 Nenhuma região cadastrada. Crie a sua primeira região abaixo!")
+
+    st.divider()
+    
+    if is_supreme:
+        st.subheader("➕ Criar Nova Região")
+        with st.form("form_nova_regiao"):
+            col1, col2 = st.columns(2)
+            with col1:
+                nome_interno = st.text_input("Nome interno (ex: brasil)", placeholder="Ex: brasil")
+                center_lat = st.number_input("Latitude Central", value=-14.2350, format="%.4f")
+            with col2:
+                nome_display = st.text_input("Nome de exibição (ex: Brasil)", placeholder="Ex: Brasil")
+                center_lng = st.number_input("Longitude Central", value=-51.9253, format="%.4f")
+            
+            zoom_inicial = st.slider("Zoom inicial do mapa", 3, 15, 4)
+            
+            if st.form_submit_button("Criar Região", type="primary"):
+                if not nome_interno or not nome_display:
+                    st.error("Preencha os nomes da região!")
+                else:
+                    try:
+                        from core.models.region import Region
+                        existing = db.query(Region).filter(Region.name == nome_interno).first()
+                        if existing:
+                            st.error(f"Já existe uma região com o nome interno '{nome_interno}'.")
+                        else:
+                            nova_regiao = Region(
+                                name=nome_interno,
+                                display_name=nome_display,
+                                region_type="pais",
+                                center_lat=center_lat,
+                                center_lng=center_lng,
+                                zoom_level=zoom_inicial
+                            )
+                            db.add(nova_regiao)
+                            db.commit()
+                            st.success(f"✅ Região '{nome_display}' criada com sucesso!")
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Erro ao criar região: {str(e)}")
+    else:
+        st.caption("🔒 Apenas o Supremo (ID 1) pode criar novas regiões.")
 
 # ========== ABA 3: ESTATÍSTICAS ==========
 with tab3:
     st.subheader("📊 Métricas de Acesso e IPs")
-    
-    # Importa o modelo de log
     try:
         from core.models.access_log import AccessLog
-        
         logs = db.query(AccessLog).all()
         
         if not logs:
