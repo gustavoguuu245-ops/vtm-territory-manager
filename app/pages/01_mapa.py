@@ -114,9 +114,26 @@ def render_mapa():
         if not has_draw and not (map_data and map_data.get("last_clicked")):
             if not is_viewing_other:
                 st.info("👆 Clique no mapa para marcar um ponto, ou desenhe um polígono.")
-    
+            
+        # ========================================================
+        # TUTORIAL RÁPIDO PARA NOVOS USUÁRIOS
+
+        with st.expander("💡 Como criar seu primeiro Território?", expanded=False):
+            st.markdown("""
+            **1. Desenhe a área:**  
+            Use a ferramenta de **Polígono** (o ícone de pentágono ou quadrado no lado esquerdo do mapa).  
+            Clique em vários pontos para contornar o bairro ou área que você quer dominar.
+
+            **2. Feche a forma:**  
+            Dê um **duplo clique** no último ponto para fechar o polígono.
+
+            **3. Salve o domínio:**  
+            Preencha o nome do território, escolha o Clã, ajuste os níveis e clique no botão vermelho **Salvar Território**.
+            """)
+        # ========================================================
+
     with col_panel:
-        # ========== LISTA DE TERRITÓRIOS ==========
+                # ========== LISTA DE TERRITÓRIOS ==========
         st.subheader("🏛️ Domínios da Região")
         
         if territories:
@@ -128,9 +145,26 @@ def render_mapa():
                     
                     # Só permite editar se for o próprio mapa e tiver permissão
                     if not is_viewing_other and user.can_edit_region(selected_region.name):
+                        
+                        # Botão de Editar
                         if st.button(f"✏️ Editar", key=f"edit_btn_{t.id}"):
                             st.session_state.editing_territory = t.id
                             st.rerun()
+                        
+                        # ============================================================
+                        # NOVO: BOTÃO DE EXCLUIR COM CONFIRMAÇÃO
+                        # ============================================================
+                        with st.popover("🗑️ Excluir Território", use_container_width=True):
+                            st.warning(f"Tem certeza que deseja excluir **{t.name}**?")
+                            st.caption("Essa ação não pode ser desfeita.")
+                            if st.button("Sim, excluir permanentemente", key=f"delete_confirm_{t.id}", type="primary"):
+                                result = service.delete_territory(t.id, user)
+                                if result["success"]:
+                                    st.success(result["message"])
+                                    st.rerun()
+                                else:
+                                    st.error(result["error"])
+                        # ============================================================
         else:
             st.info("📭 Nenhum território cadastrado.")
         
