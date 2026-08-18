@@ -95,7 +95,7 @@ class TerritoryService:
             SessionLock.locked_by == user.username
         ).update({"is_active": 0})
         self.db.commit()
-
+    
     def update_territory(self, territory_id: int, user: User, changes: Dict[str, Any], reason: str = None, expected_version: int = None) -> Dict[str, Any]:
         territory = self.get_territory(territory_id)
         if not territory:
@@ -179,6 +179,39 @@ class TerritoryService:
             self.db.commit()
         
         return territory
+
+    def delete_territory(self, territory_id: int, user: User, reason: str = None) -> Dict[str, Any]:
+        """Remove logicamente um território (soft-delete)."""
+        territory = self.get_territory(territory_id)
+        if not territory:
+            return {"success": False, "error": "Território não encontrado"}
+        
+        if not user.can_edit_region(territory.region.name if territory.region else ""):
+            return {"success": False, "error": "Você não tem permissão para excluir territórios nesta região"}
+        
+        # Aplica o soft-delete (desativa o território)
+        territory.is_active = 0
+        territory.modified_by = user.username
+        territory.modified_at = datetime.now(timezone.utc)
+        
+        # Registra a exclusão no histórico
+        if settings.ENABLE_AUDIT_LOG:
+            history = TerritoryHistory(
+                territory_id=territory_id,
+                modified_by=user.username,
+                modified_by_role=user.role,
+                field_changed="DELETED",
+                old_value=territory.name,
+                new_value=None,
+                full_snapshot=self._territory_to_dict(territory),
+                change_reason=reason or "Exclusão pelo usuário"
+            )
+            self.db.add(history)
+        
+        self.db.commit()
+        self.db.refresh(territory)
+        self.release_lock(territory_id, user)
+        return {"success": True, "message": f"Território '{territory.name}' excluído com sucesso."}
 
     def get_history(self, territory_id: int = None, limit: int = 100) -> List[TerritoryHistory]:
         query = self.db.query(TerritoryHistory).order_by(TerritoryHistory.changed_at.desc())
